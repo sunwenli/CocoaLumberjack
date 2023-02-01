@@ -42,7 +42,7 @@ jobs:
       && github.event.issue.pull_request != null
       && startsWith(github.event.comment.body, '/run_checks')
     steps:
-      - uses: sushichop/action-repository-permission@v1
+      - uses: sushichop/action-repository-permission@v2
         with:
           required-permission: write
           reaction-permitted: '+1'
