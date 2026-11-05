@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 55;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -159,14 +159,15 @@
 		DC7DC5221415523E00601B40 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0900;
+				LastUpgradeCheck = 1410;
 			};
 			buildConfigurationList = DC7DC5251415523E00601B40 /* Build configuration list for PBXProject "RegisteredLoggingTest" */;
-			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
+			compatibilityVersion = "Xcode 13.0";
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = DC7DC5201415523E00601B40;
 			productRefGroup = DC7DC52C1415523E00601B40 /* Products */;
@@ -256,7 +257,10 @@
 				GCC_PREFIX_HEADER = "RegisteredLoggingTest/RegisteredLoggingTest-Prefix.pch";
 				INFOPLIST_FILE = "RegisteredLoggingTest/RegisteredLoggingTest-Info.plist";
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};
@@ -269,7 +273,10 @@
 				GCC_PREFIX_HEADER = "RegisteredLoggingTest/RegisteredLoggingTest-Prefix.pch";
 				INFOPLIST_FILE = "RegisteredLoggingTest/RegisteredLoggingTest-Info.plist";
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				WRAPPER_EXTENSION = app;
 			};

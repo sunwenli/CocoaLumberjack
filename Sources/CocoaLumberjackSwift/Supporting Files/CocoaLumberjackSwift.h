@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -16,5 +16,7 @@
 // This header is mostly blank because all of the declarations are in Swift.
 // Still, this header may still be needed so Swift doesn't complain when importing CocoaLumberjackSwift.
 
+// Make CocoaLumberjack (ObjC) symbols visible.
 #import <CocoaLumberjack/CocoaLumberjack.h>
+// In the Xcode project, this header belongs to CocoaLumberjackSwift instead of a separate target.
 #import <CocoaLumberjackSwift/SwiftLogLevel.h>

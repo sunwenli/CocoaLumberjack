@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -25,6 +25,30 @@
 
 static const DDLogLevel ddLogLevel = DDLogLevelAll;
 
+@interface DDFileLogger (Testing)
+- (nullable NSData *)lt_dataForMessage:(nonnull DDLogMessage *)logMessage;
+@end
+
+@interface DDMockedSerializer: NSObject <DDFileLogMessageSerializer>
+@property (nonatomic, nonnull, readonly) NSData * _Nonnull(^serializerBlock)(NSString  * _Nonnull, DDLogMessage * _Nullable);
+- (instancetype)initWithSerializerBlock:(NSData * _Nonnull(^_Nonnull)(NSString  * _Nonnull, DDLogMessage * _Nullable))serializerBlock;
+@end
+
+@implementation DDMockedSerializer
+@synthesize serializerBlock = _serializerBlock;
+- (instancetype)initWithSerializerBlock:(NSData * _Nonnull(^)(NSString * _Nonnull, DDLogMessage * _Nullable))serializerBlock {
+    if (self = [super init]) {
+        self->_serializerBlock = serializerBlock;
+    }
+    return self;
+}
+
+- (NSData *)dataForString:(NSString *)string originatingFromMessage:(DDLogMessage *)message {
+    return self.serializerBlock(string, message);
+}
+
+@end
+
 @interface DDFileLoggerTests : XCTestCase {
     DDSampleFileManager *logFileManager;
     DDFileLogger *logger;
@@ -48,7 +72,7 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     [DDLog removeAllLoggers];
     // We need to sync all involved queues to wait for the post-removal processing of the logger to finish before deleting the files.
     NSAssert(![self->logger isOnGlobalLoggingQueue], @"Trouble ahead!");
-    dispatch_sync([DDLog loggingQueue], ^{
+    dispatch_sync(DDLog.loggingQueue, ^{
         NSAssert(![self->logger isOnInternalLoggerQueue], @"Trouble ahead!");
         dispatch_sync(self->logger.loggerQueue, ^{
             /* noop */
@@ -68,6 +92,7 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     XCTAssertTrue([[NSFileManager defaultManager] removeItemAtPath:logsDirectory error:&error]);
     XCTAssertNil(error);
 
+    logFileManager = nil;
     logger = nil;
     logsDirectory = nil;
 }
@@ -92,6 +117,36 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     XCTAssertFalse(newLogFileInfo.isArchived);
 }
 
+- (void)testLoggingAfterLogFileRolling {
+    [DDLog addLogger:logger];
+    DDLogError(@"Some log in the old file");
+    __auto_type oldLogFileInfo = [logger currentLogFileInfo];
+    XCTAssertNotNil(oldLogFileInfo);
+    __auto_type expectation = [self expectationWithDescription:@"Waiting for the log file to be rolled"];
+    [logger rollLogFileWithCompletionBlock:^{
+        [expectation fulfill];
+    }];
+    [self waitForExpectationsWithTimeout:3 handler:^(NSError * _Nullable error) {
+        XCTAssertNil(error);
+    }];
+    DDLogError(@"Some log in the new file");
+    __auto_type newLogFileInfo = [logger currentLogFileInfo];
+    XCTAssertNotNil(newLogFileInfo);
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:oldLogFileInfo.filePath]);
+    XCTAssertTrue([[NSFileManager defaultManager] fileExistsAtPath:newLogFileInfo.filePath]);
+    __auto_type oldString = [NSString stringWithContentsOfFile:oldLogFileInfo.filePath
+                                                      encoding:NSUTF8StringEncoding
+                                                         error:nil];
+    __auto_type newString = [NSString stringWithContentsOfFile:newLogFileInfo.filePath
+                                                      encoding:NSUTF8StringEncoding
+                                                         error:nil];
+
+    XCTAssertFalse(oldString.length == 0);
+    XCTAssertFalse(newString.length == 0);
+    XCTAssertTrue([oldString containsString:@"Some log in the old file"]);
+    XCTAssertTrue([newString containsString:@"Some log in the new file"]);
+}
+
 - (void)testExplicitLogFileRollingWhenNotReusingLogFiles {
     logger.doNotReuseLogFiles = YES;
 
@@ -112,12 +167,15 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
 }
 
 - (void)testAutomaticLogFileRollingWhenNotReusingLogFiles {
+    // Use new logger so that it appears to be resuming.
     DDFileLogger *newLogger = [[DDFileLogger alloc] initWithLogFileManager:logFileManager];
     newLogger.doNotReuseLogFiles = YES;
 
     [DDLog addLogger:logger];
+
     DDLogError(@"Some log in the old file");
     __auto_type oldLogFileInfo = [logger currentLogFileInfo];
+    usleep(1000); // prevent file name clash due to same time.
     __auto_type newLogFileInfo = [newLogger currentLogFileInfo];
     XCTAssertNotNil(oldLogFileInfo);
     XCTAssertNotNil(newLogFileInfo);
@@ -134,7 +192,9 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     __auto_type info2 = logger.currentLogFileInfo;
     XCTAssertEqualObjects(info1.filePath, info2.filePath);
 
-    info1.isArchived = YES;
+    info2.isArchived = YES;
+
+    usleep(1000); // make sure we have a different msec count. Otherwise the file names might be equal.
 
     __auto_type info3 = logger.currentLogFileInfo;
     __auto_type info4 = logger.currentLogFileInfo;
@@ -258,9 +318,12 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     DDLogVerbose(@"%@", @"verbose");
 
     [DDLog flushLog];
+    
+    NSString* filePath = logger.currentLogFileInfo.filePath;
+    XCTAssertNotNil(filePath);
 
     NSError *error = nil;
-    NSData *data = [NSData dataWithContentsOfFile:logger.currentLogFileInfo.filePath options:NSDataReadingUncached error:&error];
+    NSData *data = [NSData dataWithContentsOfFile:filePath options:NSDataReadingUncached error:&error];
     XCTAssertNil(error);
 
     NSString *contents = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
@@ -278,13 +341,70 @@ static const DDLogLevel ddLogLevel = DDLogLevelAll;
     DDLogVerbose(@"%@", @"verbose");
 
     [DDLog flushLog];
+    
+    NSString* filePath = logger.currentLogFileInfo.filePath;
+    XCTAssertNotNil(filePath);
 
     NSError *error = nil;
-    NSData *data = [NSData dataWithContentsOfFile:logger.currentLogFileInfo.filePath options:NSDataReadingUncached error:&error];
+    NSData *data = [NSData dataWithContentsOfFile:filePath options:NSDataReadingUncached error:&error];
     XCTAssertNil(error);
 
     NSString *contents = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     XCTAssertEqual([contents componentsSeparatedByString:@"\n"].count, 5 + 2);
+}
+
+- (void)testOverwriteSymlink {
+    NSString* customFileName = @"testIgnoreSymlink_file_name.log";
+    logFileManager.customLogFileName = customFileName;
+
+    NSString* logFileName = [logFileManager.logsDirectory stringByAppendingPathComponent:customFileName];
+    NSString *tempFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+    [NSFileManager.defaultManager createFileAtPath:tempFilePath contents:nil attributes:nil];
+
+    [NSFileManager.defaultManager createDirectoryAtPath:logFileManager.logsDirectory
+                            withIntermediateDirectories:YES
+                                             attributes:nil
+                                                  error:nil];
+
+    [NSFileManager.defaultManager createSymbolicLinkAtPath:logFileName withDestinationPath:tempFilePath error:nil];
+    __auto_type info = logger.currentLogFileInfo;
+    XCTAssertEqualObjects(info.fileName, customFileName);
+    XCTAssertFalse(info.isSymlink);
+}
+
+- (void)testSerializer {
+    logFileManager.logMessageSerializer = [[DDMockedSerializer alloc] initWithSerializerBlock:^NSData *(NSString * string, DDLogMessage * msg) {
+        NSString *resultingString = [NSString stringWithFormat:@"MessageLength: %lu; Message: %@", string.length, string];
+        if (msg) {
+            resultingString = [resultingString stringByAppendingString:@"; Message was non-nil"];
+        }
+        return [resultingString dataUsingEncoding:NSUTF8StringEncoding];
+    }];
+    logger.logFormatter = nil;
+
+    __auto_type msg = [[DDLogMessage alloc] initWithFormat:@"SOME FORMAT"
+                                                 formatted:@"FORMATTED"
+                                                     level:DDLogLevelInfo
+                                                      flag:DDLogFlagInfo
+                                                   context:0
+                                                      file:@"FILE"
+                                                  function:@"FUNCTION"
+                                                      line:1
+                                                       tag:nil
+                                                   options:0
+                                                 timestamp:[NSDate date]];
+    __block NSData *data = nil;
+    dispatch_sync(DDLog.loggingQueue, ^{
+        dispatch_sync(logger->_loggerQueue, ^{
+            data = [logger lt_dataForMessage:msg];
+        });
+    });
+    XCTAssertNotNil(data);
+    __auto_type string = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    XCTAssertNotNil(string);
+    __auto_type formattedMsg = [msg.message stringByAppendingString:@"\n"];
+    __auto_type expectedString = [NSString stringWithFormat:@"MessageLength: %ld; Message: %@; Message was non-nil", formattedMsg.length, formattedMsg];
+    XCTAssertEqualObjects(string, expectedString);
 }
 
 @end

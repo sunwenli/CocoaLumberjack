@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -13,11 +13,12 @@
 //   to endorse or promote products derived from this software without specific
 //   prior written permission of Deusty, LLC.
 
+#if arch(arm64) || arch(x86_64)
 #if canImport(Combine)
-
-@testable import CocoaLumberjackSwift
-import Combine
 import XCTest
+import Combine
+import CocoaLumberjack
+@testable import CocoaLumberjackSwift
 
 @available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 final class DDLogCombineTests: XCTestCase {
@@ -25,8 +26,7 @@ final class DDLogCombineTests: XCTestCase {
     private var subscriptions = Set<AnyCancellable>()
 
     private var logFormatter: DDLogFileFormatterDefault {
-        //let's return a formatter that doesn't change based where the
-        //test is being run.
+        // let's return a formatter that doesn't change based where the test is being run.
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy/MM/dd HH:mm:ss:SSS"
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -138,49 +138,45 @@ final class DDLogCombineTests: XCTestCase {
         var receivedValue = [String]()
 
         subject
-            .formatted(with: self.logFormatter)
+            .formatted(with: logFormatter)
             .sink(receiveValue: { receivedValue.append($0) })
-            .store(in: &self.subscriptions)
+            .store(in: &subscriptions)
 
-        subject.send(DDLogMessage(message: "An error occurred",
+        subject.send(DDLogMessage("An error occurred",
                                   level: .all,
                                   flag: .error,
                                   context: 42,
                                   file: "Combine.swift",
                                   function: "PerformFailure",
                                   line: 67,
-                                  tag: nil,
-                                  options: [],
                                   timestamp: Date(timeIntervalSinceReferenceDate: 100)))
 
-        subject.send(DDLogMessage(message: "WARNING: this is incorrect",
+        subject.send(DDLogMessage("WARNING: this is incorrect",
                                   level: .all,
                                   flag: .warning,
                                   context: 23,
                                   file: "Combine.swift",
                                   function: "PerformWarning",
                                   line: 90,
-                                  tag: nil,
-                                  options: [],
                                   timestamp: Date(timeIntervalSinceReferenceDate: 200)))
 
         XCTAssertEqual(receivedValue, ["2001/01/01 00:01:40:000  An error occurred",
                                        "2001/01/01 00:03:20:000  WARNING: this is incorrect"])
     }
-    
-    func testQOSNameInstanciation() {
+
+    func testQOSNameInstantiation() {
         let name = "UI"
-        let qos : qos_class_t = {
+        let qos: qos_class_t = {
             switch DDQualityOfServiceName(rawValue: name) {
-                case DDQualityOfServiceName.userInteractive:
-                    return QOS_CLASS_USER_INTERACTIVE
-                default:
-                    return QOS_CLASS_UNSPECIFIED
+            case .userInteractive:
+                return QOS_CLASS_USER_INTERACTIVE
+            default:
+                return QOS_CLASS_UNSPECIFIED
             }
         }()
-        
+
         XCTAssertEqual(qos, QOS_CLASS_USER_INTERACTIVE)
     }
 }
-
+#endif
 #endif

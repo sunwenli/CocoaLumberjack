@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -41,6 +41,22 @@
 
 - (void)didArchiveLogFile:(NSString *)logFilePath wasRolled:(BOOL)wasRolled {
     _archivedLogFilePath = logFilePath;
+}
+
+- (NSString *)newLogFileName {
+    if (self.customLogFileName) {
+        return self.customLogFileName;
+    }
+
+    return [super newLogFileName];
+}
+
+- (BOOL)isLogFile:(NSString *)fileName {
+    if (self.customLogFileName) {
+        return [self.customLogFileName isEqualToString:fileName];
+    }
+
+    return [super isLogFile:fileName];
 }
 
 @end

@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -22,7 +22,7 @@
 #import "DDSampleFileManager.h"
 #import "DDSMocking.h"
 
-static const NSTimeInterval kAsyncExpectationTimeout = 3.0f;
+static const NSTimeInterval kAsyncExpectationTimeout = 3.0;
 
 static DDLogLevel ddLogLevel = DDLogLevelVerbose;
 

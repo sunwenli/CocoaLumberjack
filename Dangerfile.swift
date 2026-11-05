@@ -11,7 +11,7 @@ fileprivate extension Danger.File {
     var isInFMDB: Bool { contains("/FMDB/") }
 
     var isSourceFile: Bool {
-        hasSuffix(".swift") || hasSuffix(".h") || hasSuffix(".m")
+        fileType == .swift || fileType == .m || fileType == .mm || fileType == .h
     }
 
     private static let spmOnlyTargetNames: Set<String> = [
@@ -28,7 +28,7 @@ fileprivate extension Danger.File {
     }
 
     var isSwiftPackageDefintion: Bool {
-        hasPrefix("Package") && hasSuffix(".swift")
+        hasPrefix("Package") && fileType == .swift
     }
 
     var isDangerfile: Bool {
@@ -39,34 +39,29 @@ fileprivate extension Danger.File {
 let danger = Danger()
 let git = danger.git
 
-// Sometimes it's a README fix, or something like that - which isn't relevant for
-// including in a project's CHANGELOG for example
+// Sometimes it's a README fix, or something like that
 let isDeclaredTrivial = danger.github?.pullRequest.title.contains("#trivial") ?? false
-let hasSourceChanges = (git.modifiedFiles + git.createdFiles).contains { $0.isInSources }
+let hasSourceChanges = (git.modifiedFiles + git.createdFiles).contains(where: \.isInSources)
 
 // Make it more obvious that a PR is a work in progress and shouldn't be merged yet
-if danger.github?.pullRequest.title.contains("WIP") == true {
-    warn("PR is marked as Work in Progress")
+if danger.github?.pullRequest.title.contains("WIP") == true && danger.github?.pullRequest.draft != true {
+    warn("PR is marked as Work in Progress. Please consider marking the PR as Draft in GitHub to prevent merges.")
 }
 
 // Warn when there is a big PR
-if let additions = danger.github?.pullRequest.additions, let deletions = danger.github?.pullRequest.deletions,
+if let additions = danger.github?.pullRequest.additions,
+   let deletions = danger.github?.pullRequest.deletions,
    case let sum = additions + deletions, sum > 1000 {
     warn("Pull request is relatively big (\(sum) lines changed). If this PR contains multiple changes, consider splitting it into separate PRs for easier reviews.")
 }
 
-// Changelog entries are required for changes to library files.
-if hasSourceChanges && !isDeclaredTrivial && !git.modifiedFiles.contains("CHANGELOG.md") {
-  warn("Any changes to library code should be reflected in the CHANGELOG. Please consider adding a note there about your change.")
-}
-
 // Warn when library files has been updated but not tests.
-if hasSourceChanges && !git.modifiedFiles.contains(where: { $0.isInTests }) {
+if hasSourceChanges && !git.modifiedFiles.contains(where: \.isInTests) {
   warn("The library files were changed, but the tests remained unmodified. Consider updating or adding to the tests to match the library changes.")
 }
 
 // Run SwiftLint
-SwiftLint.lint(.modifiedAndCreatedFiles(directory: "Sources"))
+SwiftLint.lint(.modifiedAndCreatedFiles(directory: "Sources"), inline: true)
 
 // Added (or removed) library files need to be added (or removed) from the
 // Carthage Xcode project to avoid breaking things for our Carthage users.
@@ -75,15 +70,6 @@ let xcodeProjectWasModified = git.modifiedFiles.contains(xcodeProjectFile)
 if (git.createdFiles + git.deletedFiles).contains(where: { $0.isInSources && $0.isSourceFile && !$0.isSPMOnlySourceFile })
     && !xcodeProjectWasModified {
   fail("Added or removed library files require the Carthage Xcode project to be updated.")
-}
-
-// Check if Carthage modified and CocoaPods didn't or vice-versa
-let podspecWasModified = git.modifiedFiles.contains("CocoaLumberjack.podspec")
-if xcodeProjectWasModified && !podspecWasModified {
-  warn("The Carthage project was modified but CocoaPods podspec wasn't. Did you forget to update the podspec?")
-}
-if !xcodeProjectWasModified && podspecWasModified {
-  warn("The CocoaPods podspec was modified but the Carthage project wasn't. Did you forget to update the xcodeproj?")
 }
 
 // Check xcodeproj settings are not changed
@@ -136,7 +122,7 @@ let copyrightLines = (
     source: [
         "// Software License Agreement (BSD License)",
         "//",
-        "// Copyright (c) 2010-2021, Deusty, LLC",
+        "// Copyright (c) 2010-2026, Deusty, LLC",
         "// All rights reserved.",
         "//",
         "// Redistribution and use of this software in source and binary forms,",
@@ -194,14 +180,14 @@ let filesWithInvalidCopyright = sourcefilesToCheck.lazy
         } else {
             return !zip(actualLines, expectedLines).allSatisfy { $0.starts(with: $1) }
         }
-}
+    }
 if !filesWithInvalidCopyright.isEmpty {
-    filesWithInvalidCopyright.forEach {
-        markdown(message: "Invalid copyright!", file: $0, line: 1)
+    filesWithInvalidCopyright.sorted().forEach {
+        warn(message: "Invalid copyright!", file: $0, line: 1)
     }
     warn("""
-         Copyright is not valid. See our default copyright in all of our files (Sources, Demos and Benchmarking use different formats).
-         Invalid files:
-         \(filesWithInvalidCopyright.map { "- \($0)" }.joined(separator: "\n"))
+         Copyright is not valid. See our default copyright in all of our files (Sources, Demos and Benchmarking use different formats).<br/>
+         Invalid files:<br/>
+         \(filesWithInvalidCopyright.map { "- \($0)" }.joined(separator: "<br/>\n"))
          """)
 }

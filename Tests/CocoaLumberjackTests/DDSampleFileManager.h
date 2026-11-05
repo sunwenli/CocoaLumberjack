@@ -1,6 +1,6 @@
 // Software License Agreement (BSD License)
 //
-// Copyright (c) 2010-2021, Deusty, LLC
+// Copyright (c) 2010-2026, Deusty, LLC
 // All rights reserved.
 //
 // Redistribution and use of this software in source and binary forms,
@@ -21,6 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface DDSampleFileManager : DDLogFileManagerDefault
 
 @property (nonatomic) NSString *archivedLogFilePath;
+@property (nonatomic) NSString *customLogFileName;
 
 - (instancetype)initWithLogFileHeader:(NSString * __nullable)header NS_DESIGNATED_INITIALIZER;
 
